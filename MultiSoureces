@@ -1,0 +1,159 @@
+
+import com.alibaba.druid.pool.DruidDataSource;
+import javax.sql.DataSource;
+import org.apache.ibatis.session.SqlSessionFactory;
+import org.mybatis.spring.SqlSessionFactoryBean;
+import org.mybatis.spring.annotation.MapperScan;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
+import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
+import org.springframework.jdbc.datasource.DataSourceTransactionManager;
+
+/**
+ * @author 第一个数据源 配置单独的sqlsession
+ */
+@Configuration
+@MapperScan(basePackages = DataSourceConfig.PACKAGE, sqlSessionFactoryRef = "sqlSessionFactory1")
+public class DataSourceConfig {
+
+    static final String PACKAGE = "com.xxx1.mapper";
+
+    private static final String MAPPER_LOCATION = "classpath:mybatis/mapper/*.xml";
+
+    @Value(key="spring.datasource.website.url", fileName="db.properties")
+    private String url;
+
+    @Value(key="spring.datasource.website.username", fileName="db.properties")
+    private String user;
+
+    @Value(key="spring.datasource.website.password", fileName="db.properties")
+    private String password;
+
+    @Value(key = "spring.datasource.driver-class-name",fileName="db.properties")
+    private String driverClass;
+
+    @Bean(name = "websiteDataSource")
+    @Primary
+    public DataSource websiteDataSource() {
+        DruidDataSource dataSource = new DruidDataSource();
+        dataSource.setName("xxx");
+        dataSource.setDriverClassName(driverClass);
+        dataSource.setUrl(url);
+        dataSource.setUsername(user);
+        dataSource.setPassword(password);
+        // 配置初始化大小、最小、最大
+        dataSource.setInitialSize(10);
+        dataSource.setMinIdle(10);
+        dataSource.setMaxActive(50);
+        // 配置获取连接等待超时的时间
+        dataSource.setMaxWait(15000);
+        // 配置间隔多久才进行一次检测，检测需要关闭的空闲连接，单位是毫秒
+        dataSource.setTimeBetweenEvictionRunsMillis(60000);
+        // 配置一个连接在池中最小生存的时间，一个小时
+        dataSource.setMinEvictableIdleTimeMillis(3600000);
+        dataSource.setTestWhileIdle(true);
+        // 这里建议配置为TRUE，防止取到的连接不可用
+        dataSource.setTestOnBorrow(true);
+        dataSource.setTestOnReturn(false);
+        // 这里配置提交方式，默认就是TRUE，可以不用配置
+        dataSource.setDefaultAutoCommit(true);
+        // 验证连接有效与否的SQL，不同的数据配置不同
+        dataSource.setValidationQuery("SELECT 1");
+        return dataSource;
+    }
+
+    //只能有一个@Primary注解，表示主库，其余的是从库
+    @Bean(name = "websiteTransactionManager")
+    @Primary
+    public DataSourceTransactionManager transactionManager() {
+        return new DataSourceTransactionManager(websiteDataSource());
+    }
+
+    @Bean(name = "websiteSqlSessionFactory")
+    @Primary
+    public SqlSessionFactory sqlSessionFactory(@Qualifier("websiteDataSource")
+                                                       DataSource dataSource)
+            throws Exception {
+
+        final SqlSessionFactoryBean sessionFactory = new SqlSessionFactoryBean();
+
+        sessionFactory.setDataSource(dataSource);
+        sessionFactory.setMapperLocations(new PathMatchingResourcePatternResolver()
+                .getResources(DataSourceConfig.MAPPER_LOCATION));
+        return sessionFactory.getObject();
+    }
+}
+
+/**
+  第二个数据源配置 不能使用@Primary注解
+*/
+@Configuration
+@MapperScan(basePackages = WeixinDataSourceConfig.PACKAGE, sqlSessionFactoryRef = "weixinSqlSessionFactory")
+public class WeixinDataSourceConfig {
+
+    static final String PACKAGE = "com.xxx";
+
+    private static final String MAPPER_LOCATION = "classpath:mybatis/weixin/*.xml";
+
+
+    @Value(key = "spring.datasource.driver-class-name",fileName="db.properties")
+    private String driverClass;
+
+    @Value(key="spring.datasource.weixin.url", fileName="db.properties")
+    private String url;
+
+    @Value(key="spring.datasource.weixin.username", fileName="db.properties")
+    private String user;
+
+    @Value(key="spring.datasource.weixin.password", fileName="db.properties")
+    private String password;
+
+    @Bean(name = "weixinDataSource")
+    public DataSource weixinDataSource() {
+        DruidDataSource dataSource = new DruidDataSource();
+        dataSource.setName("weixin");
+        dataSource.setDriverClassName(driverClass);
+        dataSource.setUrl(url);
+        dataSource.setUsername(user);
+        dataSource.setPassword(password);
+        // 配置初始化大小、最小、最大
+        dataSource.setInitialSize(10);
+        dataSource.setMinIdle(10);
+        dataSource.setMaxActive(50);
+        // 配置获取连接等待超时的时间
+        dataSource.setMaxWait(15000);
+        // 配置间隔多久才进行一次检测，检测需要关闭的空闲连接，单位是毫秒
+        dataSource.setTimeBetweenEvictionRunsMillis(60000);
+        // 配置一个连接在池中最小生存的时间，一个小时
+        dataSource.setMinEvictableIdleTimeMillis(3600000);
+        dataSource.setTestWhileIdle(true);
+        // 这里建议配置为TRUE，防止取到的连接不可用
+        dataSource.setTestOnBorrow(true);
+        dataSource.setTestOnReturn(false);
+        // 这里配置提交方式，默认就是TRUE，可以不用配置
+        dataSource.setDefaultAutoCommit(true);
+        // 验证连接有效与否的SQL，不同的数据配置不同
+        dataSource.setValidationQuery("SELECT 1");
+        return dataSource;
+    }
+
+    @Bean(name = "weixinTransactionManager")
+    public DataSourceTransactionManager transactionManager() {
+        return new DataSourceTransactionManager(weixinDataSource());
+    }
+
+    @Bean(name = "weixinSqlSessionFactory")
+    public SqlSessionFactory sqlSessionFactory(@Qualifier("weixinDataSource")
+                                                       DataSource dataSource)
+            throws Exception {
+
+        final SqlSessionFactoryBean sessionFactory = new SqlSessionFactoryBean();
+
+        sessionFactory.setDataSource(dataSource);
+        sessionFactory.setMapperLocations(new PathMatchingResourcePatternResolver()
+                .getResources(WeixinDataSourceConfig.MAPPER_LOCATION));
+        return sessionFactory.getObject();
+    }
